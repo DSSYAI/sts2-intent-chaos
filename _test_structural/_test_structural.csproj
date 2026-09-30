@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- 本机没有游戏自带的 .NET 9 运行时，允许用已装的 .NET 10 跑 -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <!-- 本机路径与 mod 工程共用同一份配置（不入库，模板见 IntentChaos\local.props.example） -->
+  <Import Project="$(MSBuildProjectDirectory)\..\IntentChaos\local.props"
+          Condition="Exists('$(MSBuildProjectDirectory)\..\IntentChaos\local.props')" />
+
+  <!-- 与 _test_compat 共用同一份路径解析 -->
+  <ItemGroup>
+    <Compile Include="..\_shared\LocalPaths.cs" Link="LocalPaths.cs" />
+  </ItemGroup>
+
+</Project>
+

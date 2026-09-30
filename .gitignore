@@ -1,0 +1,30 @@
+# ── 这个仓库只收 IntentChaos（意图乱流）相关文件 ──────────────────────────
+# 做法：先把整个工作区排除，再逐项放行；同目录下别的项目、素材、工具都不入库。
+/*
+!/.gitattributes
+!/.gitignore
+!/LICENSE
+!/README.md
+!/IntentChaos/
+!/_test_compat/
+!/_test_structural/
+!/_scan/
+!/_shared/
+
+# ── 构建产物与派生物（都能重新生成，不入库）─────────────────────────────
+bin/
+obj/
+IntentChaos/workshop/content/
+_scan/move_classification.csv
+*.mojibake.bak
+
+# ── 本机配置：模板见 IntentChaos/local.props.example ──────────────────────
+local.props
+
+# ── 编辑器 / 系统杂物 ──────────────────────────────────────────────────
+.vs/
+.idea/
+.vscode/
+*.user
+Thumbs.db
+Desktop.ini

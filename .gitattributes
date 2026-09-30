@@ -1,0 +1,8 @@
+# 默认按 LF 存：仓库里的 .ps1 与 .cs 目前都是 LF，别在 checkout 时被改成 CRLF
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+*.jpg binary
+*.dll binary
+*.pdb binary

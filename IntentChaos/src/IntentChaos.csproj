@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ModId>IntentChaos</ModId>
+    <ModVersion>0.3.1</ModVersion>
+    <AssemblyName>$(ModId)</AssemblyName>
+    <RootNamespace>IntentChaos</RootNamespace>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AutoDeploy Condition="'$(AutoDeploy)' == ''">true</AutoDeploy>
+  </PropertyGroup>
+
+  <!-- 本机路径（GameDir / AutoDeploy） -->
+  <Import Project="$(MSBuildProjectDirectory)\..\local.props"
+          Condition="Exists('$(MSBuildProjectDirectory)\..\local.props')" />
+
+  <PropertyGroup>
+    <!-- 游戏所有 .NET dll 都在 <GameDir>\data_sts2_windows_x86_64\ 子目录下 -->
+    <GameLibDir>$(GameDir)\data_sts2_windows_x86_64</GameLibDir>
+  </PropertyGroup>
+
+  <Target Name="CheckGameDir" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(GameDir)' == ''"
+           Text="GameDir 未配置：请检查 local.props" />
+    <Error Condition="!Exists('$(GameLibDir)\sts2.dll')"
+           Text="在 $(GameLibDir) 找不到 sts2.dll，请检查 local.props 的 GameDir" />
+  </Target>
+
+  <!-- 引用游戏本体 dll；Harmony 直接用游戏自带的 0Harmony，无任何 mod 前置依赖。
+       纯代码 mod：没有 pack/ 资源工程，不导出 pck。 -->
+  <ItemGroup>
+    <Reference Include="sts2">
+      <HintPath>$(GameLibDir)\sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(GameLibDir)\GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameLibDir)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- 构建后自动部署到游戏 mods/IntentChaos/（json + dll + pdb） -->
+  <Target Name="DeployMod" AfterTargets="Build"
+          Condition="'$(AutoDeploy)' == 'true' and '$(GameDir)' != ''">
+    <PropertyGroup>
+      <DeployDir>$(GameDir)\mods\$(ModId)</DeployDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(DeployDir)" />
+    <ItemGroup>
+      <DeployFiles Include="$(OutputPath)$(ModId).dll" />
+      <DeployFiles Include="$(OutputPath)$(ModId).pdb" Condition="Exists('$(OutputPath)$(ModId).pdb')" />
+      <DeployJson Include="$(MSBuildProjectDirectory)\..\$(ModId).json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DeployJson)" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="[IntentChaos] Deployed to $(DeployDir)" />
+  </Target>
+
+</Project>

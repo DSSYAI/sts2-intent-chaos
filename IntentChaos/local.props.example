@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 本机路径配置模板：复制为同目录下的 local.props 再改（local.props 不入库）。
+     GameDir       = 游戏安装根目录（含 data_sts2_windows_x86_64 的那一层）
+     AutoDeploy    = 构建后是否自动把 json+dll 复制到 <GameDir>\mods\IntentChaos -->
+<Project>
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''">D:\SteamLibrary\steamapps\common\Slay the Spire 2</GameDir>
+    <AutoDeploy>true</AutoDeploy>
+  </PropertyGroup>
+</Project>

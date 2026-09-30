@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- 本机没有 .NET 9 运行时（游戏自带），允许用已装的 .NET 10 运行时跑 -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <!-- 本机路径与 mod 工程共用同一份配置（不入库，模板见 IntentChaos\local.props.example） -->
+  <Import Project="$(MSBuildProjectDirectory)\..\IntentChaos\local.props"
+          Condition="Exists('$(MSBuildProjectDirectory)\..\IntentChaos\local.props')" />
+  <PropertyGroup>
+    <GameLibDir>$(GameDir)\data_sts2_windows_x86_64</GameLibDir>
+  </PropertyGroup>
+
+  <Target Name="CheckGameDir" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(GameDir)' == ''"
+           Text="GameDir 未配置：请把 IntentChaos\local.props.example 复制为 IntentChaos\local.props 并填好 &lt;GameDir&gt;" />
+  </Target>
+
+  <!-- 测试宿主把 0Harmony 复制到输出（游戏内 mod 则用游戏自带的，Private=false） -->
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameLibDir)\0Harmony.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- 与 _test_structural 共用同一份路径解析 -->
+  <ItemGroup>
+    <Compile Include="..\_shared\LocalPaths.cs" Link="LocalPaths.cs" />
+  </ItemGroup>
+
+</Project>

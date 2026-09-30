@@ -1,0 +1,12 @@
+{
+  "id": "IntentChaos",
+  "name": "意图乱流 Intent Chaos",
+  "author": "DSSYAI",
+  "description": "怪物受到玩家的直接攻击并真实掉血后，意图立刻从它状态机的全部招式池（含一次性开场招）随机换成另一个招。遗物/能力牌/回合结束等被动伤害不触发。特例：女王前三招固定；本体脚本类招式（亡语自爆、空白意图、必须执行一次的复活/重生招）双向固定，随机不到也换不走，所以瀑布巨兽不会卡无限血、千足虫不会顶着一个什么都不做的空意图；boss 的招式池里额外有一招\"塞诅咒牌\"（永久进卡组，寄生式）。\nMonsters that lose HP to direct player attack damage reroll their intent to a random different move from their entire move pool (including one-shot openers). Relic/power/end-of-turn passive damage doesn't trigger. Queen keeps her first three moves fixed; scripted moves (death blow / self-destruct, blank hidden intents, must-perform revive states) are pinned both ways, so self-destruct bosses still die and split limbs never sit on a do-nothing blank intent. Bosses gain a curse-card move that permanently adds a curse to your deck.",
+  "version": "0.3.1",
+  "has_pck": false,
+  "has_dll": true,
+  "affects_gameplay": true,
+  "min_game_version": "0.107.1",
+  "dependencies": []
+}
