@@ -32,6 +32,18 @@ public sealed class ModConfig
     /// 亡语/自爆招不受本项影响，永远固定。</summary>
     public bool pinStructuralMoves { get; set; } = true;
 
+    /// <summary>boss 的一次性开场招固定（v0.3.2，默认开）：状态机里"没有任何后继指向它"的链头招，
+    /// 本体一辈子只会走到一次；而 <c>SetMoveImmediate</c> 换招时连状态机的当前位置一起搬走
+    /// （本体源码：NextMove = state; MoveStateMachine.ForceCurrentState(state)），
+    /// 所以一旦把它换走，本体的脚本就永久改道、这招再也不会自己回来。
+    /// 判据只认"boss 房 + 入度 0 的链头 + 意图含 StatusIntent（往玩家牌堆塞牌）"三条游戏内属性，
+    /// v0.111.0 全库实测只有沙虫 TheInsatiable 的 LIQUIFY_GROUND_MOVE 命中：
+    /// 换走它 = 吞噬倒计时（SandpitPower）和 6 张慌乱逃离整场消失；
+    /// 反过来把它随机发到中盘 = 同一玩家身上挂两条独立倒计时（SandpitPower 是 Instanced）。
+    /// 所以双向固定：不换走、也不进池。普通怪的同类开场照旧全随机。
+    /// 关掉它则沙虫的开场招重新变成每回合约 1/5 的摇号，boss 机制可能整场不出现。</summary>
+    public bool preserveBossOpenings { get; set; } = true;
+
     /// <summary>救场：怪物处于本体标记的"无限血/死亡结算中"阶段（瀑布巨兽血归零后的约爆状态）
     /// 而它的自爆亡语招曾被换走时，把亡语招强行放回去，让这场战斗能正常结束。
     /// 关掉它则旧存档里已经卡死的场次会一直打不死。</summary>

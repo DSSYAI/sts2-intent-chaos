@@ -1,7 +1,7 @@
 ﻿# 全库扫描：按 IntentChaos v0.3.1 的判定规则，给每只怪每个招式分类，看覆盖面与副作用。
 # 纯静态解析 _sts2_decomp 的反编译源码（不加载游戏、不改任何文件）。
 # 注意：仓库不附带本体反编译产物（版权 + 体积），需自备；用 -DecompDir 指向它的根目录。
-# 用法：powershell -File scan_moves.ps1 [-DecompDir <反编译树根>] [-OutDir <csv 落点>]
+# 用法：pwsh -File scan_moves.ps1 [-DecompDir <反编译树根>] [-OutDir <csv 落点>]
 param(
     [string]$DecompDir = "",
     [string]$OutDir = ""

@@ -1,6 +1,6 @@
 ﻿# 把 Description.md（工坊说明的权威源文件）灌进 IntentChaos.vdf 的 description 字段。
 # 用法：改完 Description.md 后
-#   powershell -NoProfile -ExecutionPolicy Bypass -File IntentChaos\workshop\sync_desc_to_vdf.ps1
+#   pwsh -NoProfile -ExecutionPolicy Bypass -File IntentChaos\workshop\sync_desc_to_vdf.ps1
 # 然后再跑 sync_workshop.ps1 自检 + SteamCMD 上传。
 #
 # ⚠️ 编码：本脚本只用 [IO.File]::ReadAllText/WriteAllText + UTF8Encoding($false)。
@@ -74,4 +74,4 @@ if ($fail.Count -gt 0) {
 Write-Host '[OK] 自检通过：VDF 内 description 与 Description.md 逐字一致，无 BOM、无乱码、单行存储'
 Write-Host ''
 Write-Host '下一步：'
-Write-Host ('  powershell -NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $root 'sync_workshop.ps1') + '"')
+Write-Host ('  pwsh -NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $root 'sync_workshop.ps1') + '"')

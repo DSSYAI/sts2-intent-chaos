@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <ModId>IntentChaos</ModId>
-    <ModVersion>0.3.1</ModVersion>
+    <ModVersion>0.3.2</ModVersion>
     <AssemblyName>$(ModId)</AssemblyName>
     <RootNamespace>IntentChaos</RootNamespace>
     <OutputType>Library</OutputType>

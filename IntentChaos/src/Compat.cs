@@ -60,6 +60,13 @@ public static class Compat
     public static Func<MoveState, bool> GetCanTransitionAway = null!;
     public static Func<MoveState, bool> GetMustPerformOnce = null!;
     public static Func<MoveState, IReadOnlyList<AbstractIntent>> GetIntents = null!;
+    public static Func<MonsterState, string> GetStateId = null!;
+
+    /// <summary>某状态在链条上的后继（会走到哪些 state id）。
+    /// 返回 <b>null</b> 表示"读不出来"（本体的分支状态换了形状）——调用方必须保守处理，
+    /// 当作它可能指向任何状态，绝不能据此断定某招"再也回不来"。</summary>
+    public static Func<MonsterState, string[]?> GetSuccessorIds = null!;
+
     public static Func<MonsterModel, ModelId> GetModelId = null!;
     public static Func<ICombatState, EncounterModel?> GetEncounter = null!;
     public static Func<EncounterModel, RoomType> GetRoomType = null!;
@@ -109,6 +116,8 @@ public static class Compat
             GetCanTransitionAway = Getter<MoveState, bool>(P(typeof(MonsterState), "CanTransitionAway"));
             GetMustPerformOnce = Getter<MoveState, bool>(P(typeof(MoveState), "MustPerformOnceBeforeTransitioning"));
             GetIntents = Getter<MoveState, IReadOnlyList<AbstractIntent>>(P(typeof(MoveState), "Intents"));
+            GetStateId = Getter<MonsterState, string>(P(typeof(MonsterState), "Id"));
+            GetSuccessorIds = BuildSuccessorIds();
             GetModelId = Getter<MonsterModel, ModelId>(P(typeof(MonsterModel), "Id"));
             GetEncounter = Getter<ICombatState, EncounterModel>(P(typeof(CombatState), "Encounter"));
             GetRoomType = Getter<EncounterModel, RoomType>(P(typeof(EncounterModel), "RoomType"));
@@ -271,6 +280,81 @@ public static class Compat
             : Expression.Call(Expression.Convert(self, mi.DeclaringType!), mi, converted,
                 Expression.Constant(forceTransition, ps[1].ParameterType));
         return Expression.Lambda<Action<MonsterModel, MoveState>>(body, self, state).Compile();
+    }
+
+    /// <summary>
+    /// 链条后继读取：MoveState 走公开的 FollowUpState / FollowUpStateId；
+    /// 分支状态（RandomBranchState / ConditionalBranchState）用"名叫 States 的集合 + 元素里名叫
+    /// stateId/id 的字段"这种形状约定去读，读不准就返回 null（调用方保守处理）。
+    /// 只在 boss 的一次性开场招判定里按需用，不在每次伤害的热路径上。
+    /// </summary>
+    private static Func<MonsterState, string[]?> BuildSuccessorIds()
+    {
+        var getFollowUp = Getter<MoveState, MonsterState>(P(typeof(MoveState), "FollowUpState"));
+        var getFollowUpId = Getter<MoveState, string>(P(typeof(MoveState), "FollowUpStateId"));
+        var getId = Getter<MonsterState, string>(P(typeof(MonsterState), "Id"));
+        const BindingFlags F = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
+        return st =>
+        {
+            try
+            {
+                if (st == null)
+                {
+                    return null;
+                }
+                if (st is MoveState mst)
+                {
+                    var target = getFollowUp(mst);
+                    if (target != null)
+                    {
+                        return new[] { getId(target) };
+                    }
+                    var byId = getFollowUpId(mst);
+                    return string.IsNullOrEmpty(byId) ? Array.Empty<string>() : new[] { byId };
+                }
+                // 分支状态：自己的类型（含基类）上找名为 States 的集合属性
+                object? seq = null;
+                for (Type? t = st.GetType(); t != null && seq == null; t = t.BaseType)
+                {
+                    var pi = t.GetProperty("States", F);
+                    if (pi != null && typeof(System.Collections.IEnumerable).IsAssignableFrom(pi.PropertyType) && pi.PropertyType != typeof(string))
+                    {
+                        seq = pi.GetValue(st);
+                    }
+                }
+                if (seq is not System.Collections.IEnumerable list)
+                {
+                    return null;
+                }
+                var ids = new List<string>();
+                foreach (var item in list)
+                {
+                    if (item == null)
+                    {
+                        return null;
+                    }
+                    string? found = null;
+                    foreach (var name in new[] { "stateId", "id", "Id", "StateId" })
+                    {
+                        var fi = item.GetType().GetField(name, F);
+                        if (fi != null) { found = fi.GetValue(item) as string; break; }
+                        var pp = item.GetType().GetProperty(name, F);
+                        if (pp != null) { found = pp.GetValue(item) as string; break; }
+                    }
+                    if (string.IsNullOrEmpty(found))
+                    {
+                        return null; // 元素形状不认识 → 不知道它能去哪
+                    }
+                    ids.Add(found!);
+                }
+                return ids.ToArray();
+            }
+            catch
+            {
+                return null;
+            }
+        };
     }
 
     private static PropertyInfo P(Type decl, string name)

@@ -1,5 +1,5 @@
 ﻿# 生成 IntentChaos 创意工坊封面图 preview.jpg（1024x576）
-# 需要 UTF-8 BOM 运行：powershell -File gen_workshop_preview.ps1
+# 需要 UTF-8 BOM 运行：pwsh -File gen_workshop_preview.ps1
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Drawing
 

@@ -1,6 +1,6 @@
 ﻿# 把最新构建的 mod 文件同步到工坊上传目录（workshop/content/IntentChaos）。
 # 用法：先 dotnet build IntentChaos 工程，再运行本脚本；之后用 SteamCMD 重新上传即可更新同一个工坊物品。
-# powershell -NoProfile -ExecutionPolicy Bypass -File sync_workshop.ps1 [-Version v0.3.0]
+# pwsh -NoProfile -ExecutionPolicy Bypass -File sync_workshop.ps1 [-Version v0.3.0]
 #
 # ⚠️ 编码铁律：这里的 json / vdf 必须是 **UTF-8 无 BOM**，而 Windows PowerShell 5.1 的
 # Get-Content / Set-Content 默认按 ANSI(GBK) 读写。用它改写含中文的文件会把中文变成不可逆乱码
@@ -56,14 +56,17 @@ if (Test-Path $builtDll) {
 }
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $content 'IntentChaos.pdb'), (Join-Path $content 'config.json')
 
-# VDF 的 contentfolder / previewfile 必须是本机绝对路径，每台机器不同 → 每次同步按当前仓库位置刷新，
-# 别手改这两行（仓库里存的是 <REPO> 占位符，由本脚本替换成本机路径）。
+# 仓库里那份 IntentChaos.vdf 是**模板**：contentfolder / previewfile 两行只存 <REPO> 占位符。
+# 真正给 SteamCMD 用的是本脚本生成的 IntentChaos.upload.vdf（绝对路径，属生成物，已 .gitignore）。
+# 为什么这么分：这里以前每次同步都把本机绝对路径写回跟踪文件，于是工作区常年脏一次；
+# 2026-09-30 真跑过一次上传后那两行就留在仓库里了，差点把本机绝对路径提交进公开仓库。
+# 所以：① 先把模板里被写花的路径归一回占位符；② 绝对路径只写进 upload 副本。
 $repoFwd = $repoRoot -replace '\\', '/'
-$v = Read-Utf8 $vdf
-$v = [regex]::Replace($v, '(?m)^([ \t]*"contentfolder"[ \t]*)".*"$',
-    ('$1"' + $repoFwd + '/IntentChaos/workshop/content/IntentChaos"'))
-$v = [regex]::Replace($v, '(?m)^([ \t]*"previewfile"[ \t]*)".*"$',
-    ('$1"' + $repoFwd + '/IntentChaos/workshop/preview.jpg"'))
+$uploadVdf = Join-Path $PSScriptRoot 'IntentChaos.upload.vdf'
+$orig = Read-Utf8 $vdf
+# 注意替换串里别再补开引号：捕获组 1 已经吃到开引号了（多补一个就把 VDF 写成 ""<REPO>/…，自检会抓到）
+$v = [regex]::Replace($orig, '(?m)^([ \t]*"contentfolder"[ \t]*").*"$', '$1<REPO>/IntentChaos/workshop/content/IntentChaos"')
+$v = [regex]::Replace($v, '(?m)^([ \t]*"previewfile"[ \t]*").*"$', '$1<REPO>/IntentChaos/workshop/preview.jpg"')
 
 # 只改 VDF 的 changenote（不再往 json 里回写版本号——正是那一步把整份清单的中文写坏的）
 if ($Version -ne "") {
@@ -71,7 +74,8 @@ if ($Version -ne "") {
     $v = [regex]::Replace($v, '"changenote"\s*"[^"]*"', ('"changenote" "' + $note + '"'))
     Write-Host "changenote -> $note"
 }
-Write-Utf8 $vdf $v
+if ($v -ne $orig) { Write-Utf8 $vdf $v; Write-Host "模板已归一（占位符）：$(Split-Path $vdf -Leaf)" }
+Write-Utf8 $uploadVdf ($v.Replace('<REPO>', $repoFwd))
 
 # ---- 同步后自检 ----
 $fail = @()
@@ -109,6 +113,28 @@ foreach ($extra in (Get-ChildItem $content | Where-Object { $_.Name -notin @('In
     $fail += ("content 目录里有无关文件 {0}，会一起上传到工坊" -f $extra.Name)
 }
 
+# ---- 模板 vs 上传副本：路径泄漏防线 ----
+$tpl = Read-Utf8 $vdf
+$upl = Read-Utf8 $uploadVdf
+foreach ($pair in @(@('模板 VDF', $vdf), @('上传副本 VDF', $uploadVdf))) {
+    $raw = [IO.File]::ReadAllBytes($pair[1])
+    if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF) { $fail += ("{0} 带了 BOM" -f $pair[0]) }
+    if (([regex]::Matches([Text.Encoding]::UTF8.GetString($raw), [string][char]0xFFFD)).Count -gt 0) { $fail += ("{0} 含替换符 U+FFFD" -f $pair[0]) }
+}
+if ($tpl -notmatch '(?m)"contentfolder"[ \t]*"<REPO>/') { $fail += "模板 VDF 的 contentfolder 不是 <REPO> 占位符（提交就会把本机路径推到公开仓库）" }
+if ($tpl -match '[A-Za-z]:[/\\](Users|agent|SteamLibrary|dev)[/\\]') { $fail += "模板 VDF 里出现本机绝对路径" }
+if ($upl -notmatch [regex]::Escape($repoFwd)) { $fail += "上传副本没带本机路径，SteamCMD 会找不到 contentfolder" }
+$upContent = [regex]::Match($upl, '"contentfolder"[ \t]*"([^"]*)"').Groups[1].Value.Replace('/', '\')
+if (-not (Test-Path -LiteralPath $upContent)) { $fail += "上传副本的 contentfolder 不存在：$upContent" }
+$relUpload = ($uploadVdf.Substring($repoRoot.Length).TrimStart('\', '/')) -replace '\\', '/'
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    Push-Location $repoRoot
+    git check-ignore -q -- $relUpload 2>$null | Out-Null
+    $notIgnored = ($LASTEXITCODE -ne 0)
+    Pop-Location
+    if ($notIgnored) { $fail += "上传副本 $relUpload 没被 .gitignore 忽略——它带本机绝对路径，绝不能进公开仓库" }
+}
+
 Write-Host "workshop content synced（清单版本 $ver）:"
 Get-ChildItem $content | ForEach-Object { Write-Host ("  " + $_.Name + "  " + $_.Length + " B") }
 Write-Host ""
@@ -120,8 +146,9 @@ if ($fail.Count -gt 0) {
     exit 1
 }
 Write-Host "[OK] 自检通过：json/vdf 均 UTF-8 无 BOM 且中文完好，dll 与游戏目录那份一致，content 无多余文件"
+Write-Host "     模板 $(Split-Path $vdf -Leaf) 保持 <REPO> 占位符（可提交），本机路径只写进 $(Split-Path $uploadVdf -Leaf)（已被 gitignore）"
 Write-Host ""
 Write-Host "上传命令（SteamCMD 首次登录会要 Steam Guard 验证码）："
 $steamCmdPath = if ($SteamCmd) { $SteamCmd } else { Join-Path $repoRoot 'tools\SteamCMD\steamcmd.exe' }
 if (-not (Test-Path $steamCmdPath)) { $steamCmdPath = '<SteamCMD>\steamcmd.exe' }
-Write-Host ('  "' + $steamCmdPath + '" +login <你的Steam用户名> +workshop_build_item "' + $vdf + '" +quit')
+Write-Host ('  "' + $steamCmdPath + '" +login <你的Steam用户名> +workshop_build_item "' + $uploadVdf + '" +quit')

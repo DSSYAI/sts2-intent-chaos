@@ -13,7 +13,7 @@ namespace IntentChaos;
 public static class ModEntry
 {
     public const string ModId = "IntentChaos";
-    public const string Version = "0.3.1";
+    public const string Version = "0.3.2";
 
     public static void OnModLoaded()
     {
@@ -40,7 +40,9 @@ public static class ModEntry
                 "怪物被玩家直接攻击掉血 → 从招式池（含开场招）随机换成其他招；女王前三招固定；" +
                 "结构性招双向固定（亡语/自爆 + 空白意图招 + 本体锁定招）：瀑布巨兽不会卡无限血，" +
                 "千足虫 DEAD_MOVE 那类空意图不会被随机发给活肢体；" +
+                "boss 一次性开场招（入度 0 链头 + 塞状态牌意图）双向固定：沙虫的吞噬倒计时不会被换走，也不会被发第二遍；" +
                 $"结构性固定={(ModConfig.Instance.pinStructuralMoves ? "开" : "关")}，" +
+                $"boss开场固定={(ModConfig.Instance.preserveBossOpenings ? "开" : "关")}，" +
                 $"黑名单对称固定={(ModConfig.Instance.pinBlacklistedMoves ? "开" : "关")}，" +
                 $"断链救场={(ModConfig.Instance.repairStrandedDeathBlows ? "开" : "关")}，" +
                 $"boss 招式池含塞诅咒招（{(Compat.Curse.Available ? $"可用，{ModConfig.Instance.bossCurseCardId}" : $"不可用：{Compat.Curse.FailReason}")}）。");

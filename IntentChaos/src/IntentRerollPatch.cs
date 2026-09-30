@@ -30,7 +30,9 @@ namespace IntentChaos;
 /// 亡语/自爆（DeathBlowIntent，瀑布巨兽靠 EXPLODE_MOVE 自杀才死得掉）、
 /// 空白意图招（零意图或全 HiddenIntent，千足虫 DEAD_MOVE 是重生链链头）、
 /// 本体锁定招（MustPerformOnceBeforeTransitioning，REATTACH/RESPAWN/ABOUT_TO_BLOW）。
-/// 另有黑名单招（逃跑/睡眠/眩晕 + excludeMoveIds）默认也双向固定。详见 StructuralReason。
+/// v0.3.2 再加一类：boss 的一次性开场招（状态机入度 0 的链头 + 意图含 StatusIntent），
+/// 理由是换招会把状态机当前位置一起搬走、链条永久改道（沙虫的吞噬倒计时靠这一招发动）。
+/// 另有黑名单招（逃跑/睡眠/眩晕 + excludeMoveIds）默认也双向固定。详见 StructuralReason / IsOneShotBossGrant。
 /// </summary>
 public static class IntentRerollPatch
 {
@@ -132,7 +134,9 @@ public static class IntentRerollPatch
         //   EXPLODE_MOVE（亡语，自杀才是它唯一死法），换掉任何一环就永久打不死。
         // 千足虫：肢体死后 → DEAD_MOVE（零意图，画面上什么都不显示）→ REATTACH_MOVE（回血，锁定）
         //   → 复活。空白招发给活肢体＝一个"什么都不做、再打也不变"的意图（v0.3.1 用户报告）。
-        string? pinned = PinReason(current, currentId);
+        // 沙虫（TheInsatiable，v0.3.2 用户报告）：首回合 LIQUIFY_GROUND_MOVE 是链头且无后继指向它，
+        //   换走＝吞噬倒计时和 6 张慌乱逃离整场消失 → 见 IsOneShotBossGrant。
+        string? pinned = PinReason(current, currentId, machine, isBoss);
         if (pinned != null)
         {
             if (trace) GD.Print($"[IntentChaos][trace] 退出：当前招 {currentId} {pinned}");
@@ -188,6 +192,13 @@ public static class IntentRerollPatch
                 // 空白招发出去就是"怪头顶什么都不显示、这一回合什么都不做"；
                 // 锁定招发出去就连本体自己都换不走，还会挡住本体的死亡/重生脚本。
                 if (trace) GD.Print($"[IntentChaos][trace] 池排除：{id}（结构性招：{StructuralReason(ms)}）");
+                continue;
+            }
+            if (IsOneShotBossGrant(ms, machine, isBoss))
+            {
+                // boss 一辈子只走到一次的开场招：发第二遍等于把开场演两遍
+                // （沙虫＝同一个玩家身上挂两条独立的吞噬倒计时，慌乱逃离只回推其中一条）。
+                if (trace) GD.Print($"[IntentChaos][trace] 池排除：{id}（boss 一次性开场招，本体链条不会回访）");
                 continue;
             }
             if (IsExcluded(ms, id))
@@ -298,18 +309,90 @@ public static class IntentRerollPatch
     /// 当前招能不能被换走。返回不可换的原因；null 表示可以换。
     /// 结构性招（见 StructuralReason）绝对不换，黑名单招在 pinBlacklistedMoves 下也不换。
     /// </summary>
-    private static string? PinReason(MoveState current, string currentId)
+    private static string? PinReason(MoveState current, string currentId, MonsterMoveStateMachine machine, bool isBoss)
     {
         string? structural = StructuralReason(current);
         if (structural != null)
         {
             return structural;
         }
+        if (IsOneShotBossGrant(current, machine, isBoss))
+        {
+            return "是 boss 的一次性开场招（往玩家牌堆塞牌，本体链条不会回访）：换走就整场消失";
+        }
         if (ModConfig.Instance.pinBlacklistedMoves && IsExcluded(current, currentId))
         {
             return "在黑名单内（不进池也不换走，否则这招永久消失）";
         }
         return null;
+    }
+
+    /// <summary>
+    /// boss 的"一次性开场招"：房间是 Boss + 状态机里没有任何后继指向这一招 + 意图含 StatusIntent
+    /// （往玩家牌堆塞状态牌）。三条判据全是游戏内属性，不写怪名。
+    /// <para>为什么必须双向固定（既不换走也不进池）：</para>
+    /// 本体 <c>MonsterModel.SetMoveImmediate</c> 换招时是「NextMove = state; ForceCurrentState(state)」，
+    /// 把状态机的当前位置一起搬走，所以换走链头之后<b>本体的脚本永久改道</b>，这招只能靠我们的骰子回来
+    /// （每回合约 1/5）——不回来就整场消失；反过来把它随机发到中盘，又等于把"只发生一次"的开场演两遍。
+    /// <para>沙虫 TheInsatiable 两头都坏：</para>
+    /// 换走 → 没有 SandpitPower 吞噬倒计时（全库只有 LiquifyMove 施加它），也没有 6 张慌乱逃离，
+    ///        boss 退化成纯打桩；<br/>
+    /// 发两遍 → SandpitPower 是 PowerInstanceType.Instanced（"再次施加时新增实例，不叠加"），
+    ///          同一玩家身上挂两条独立倒计时，而慌乱逃离只回推 FirstOrDefault 那一条。
+    /// <para>影响面（v0.111.0，_scan\scan_openings.ps1）：全库 101 个状态机里 27 个一次性链头，
+    /// 同时满足三条判据的只有 TheInsatiable.LIQUIFY_GROUND_MOVE。普通怪的同类开场（潮湿邪教徒的祷文、
+    /// 幽魂骑士的咒术等）判据不命中，照旧全随机。</para>
+    /// </summary>
+    private static bool IsOneShotBossGrant(MoveState ms, MonsterMoveStateMachine machine, bool isBoss)
+    {
+        if (!isBoss || !ModConfig.Instance.preserveBossOpenings)
+        {
+            return false;
+        }
+        bool grantsCards = false;
+        foreach (var i in Compat.GetIntents(ms))
+        {
+            if (i is StatusIntent)
+            {
+                grantsCards = true;
+                break;
+            }
+        }
+        if (!grantsCards)
+        {
+            return false;
+        }
+        return IsStrandedInChain(machine, Compat.GetMoveId(ms));
+    }
+
+    /// <summary>
+    /// 状态机的链条还能不能回到这个状态：没有任何状态的后继指向它（含自指）→ 一次性状态。
+    /// 只要有一个状态的后继读不出来（本体分支状态换了形状，见 Compat.GetSuccessorIds），
+    /// 一律返回 false——保守当作"能回访"，宁可少固定一招，也不误删玩家的开场花样。
+    /// </summary>
+    private static bool IsStrandedInChain(MonsterMoveStateMachine machine, string id)
+    {
+        foreach (var kv in Compat.GetStates(machine))
+        {
+            var st = kv.Value;
+            if (st == null)
+            {
+                return false;
+            }
+            var succ = Compat.GetSuccessorIds(st);
+            if (succ == null)
+            {
+                return false;
+            }
+            foreach (var s in succ)
+            {
+                if (string.Equals(s, id, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /// <summary>

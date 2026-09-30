@@ -15,7 +15,9 @@
 bin/
 obj/
 IntentChaos/workshop/content/
-_scan/move_classification.csv
+# 同步脚本生成的上传副本：里面是这台机器的绝对路径，属于生成物，绝不提交
+IntentChaos/workshop/IntentChaos.upload.vdf
+_scan/*.csv
 *.mojibake.bak
 
 # ── 本机配置：模板见 IntentChaos/local.props.example ──────────────────────
